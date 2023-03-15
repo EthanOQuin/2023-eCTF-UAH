@@ -1,0 +1,4 @@
+-I
+./lib/tivaware
+-I
+./inc
