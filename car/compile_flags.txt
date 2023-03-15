@@ -2,3 +2,7 @@
 ./lib/tivaware
 -I
 ./inc
+-D
+TARGET_IS_TM4C123_RB1
+-D
+PART_TM4C123GH6PM
