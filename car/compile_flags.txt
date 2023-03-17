@@ -1,6 +1,8 @@
 -I
 ./lib/tivaware
 -I
+./lib/libhydrogen
+-I
 ./inc
 -D
 TARGET_IS_TM4C123_RB1

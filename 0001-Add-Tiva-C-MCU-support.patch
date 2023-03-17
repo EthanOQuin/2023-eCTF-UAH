@@ -1,0 +1,114 @@
+From 7095bf29066e9866c6f097316e7512e3e4a860d8 Mon Sep 17 00:00:00 2001
+From: Ethan O'Quin <ethan.a.oquin@protonmail.com>
+Date: Fri, 17 Mar 2023 05:46:04 -0500
+Subject: [PATCH] Add Tiva C MCU support
+
+---
+ impl/core.h        |  2 +-
+ impl/random.h      |  2 ++
+ impl/random/tiva.h | 67 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 70 insertions(+), 1 deletion(-)
+ create mode 100644 impl/random/tiva.h
+
+diff --git a/impl/core.h b/impl/core.h
+index 0498ee5..3698e7f 100644
+--- a/impl/core.h
++++ b/impl/core.h
+@@ -42,7 +42,7 @@ hydro_bin2hex(char *hex, size_t hex_maxlen, const uint8_t *bin, size_t bin_len)
+     int          c;
+ 
+     if (bin_len >= SIZE_MAX / 2 || hex_maxlen <= bin_len * 2U) {
+-        abort();
++        return NULL;
+     }
+     while (i < bin_len) {
+         c = bin[i] & 0xf;
+diff --git a/impl/random.h b/impl/random.h
+index 29efa9a..4a2dc79 100644
+--- a/impl/random.h
++++ b/impl/random.h
+@@ -7,6 +7,8 @@ static TLS struct {
+ 
+ #if defined(AVR) && !defined(__unix__)
+ # include "random/avr.h"
++#elif defined(TIVA_C)
++#include "random/tiva.h"
+ #elif (defined(ESP32) || defined(ESP8266)) && !defined(__unix__)
+ # include "random/esp32.h"
+ #elif defined(PARTICLE) && defined(PLATFORM_ID) && PLATFORM_ID > 2 && !defined(__unix__)
+diff --git a/impl/random/tiva.h b/impl/random/tiva.h
+new file mode 100644
+index 0000000..2a4bef3
+--- /dev/null
++++ b/impl/random/tiva.h
+@@ -0,0 +1,67 @@
++#include "driverlib/adc.h"
++#include "driverlib/sysctl.h"
++#include "inc/hw_ints.h"
++#include "inc/hw_memmap.h"
++
++static void
++tiva_adc_init(void)
++{
++    // Enable the ADC0 module.
++    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
++
++    // Wait for the ADC0 module to be ready.
++    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0)) {
++    }
++
++    // Enable the first sample sequencer to capture the value of channel 0 when
++    // the processor trigger occurs.
++    ADCSequenceConfigure(ADC0_BASE, 0, ADC_TRIGGER_PROCESSOR, 0);
++    ADCSequenceStepConfigure(ADC0_BASE, 0, 0, ADC_CTL_IE | ADC_CTL_TS | ADC_CTL_END);
++    ADCSequenceEnable(ADC0_BASE, 0);
++}
++
++static uint32_t
++tiva_adc_sample(void)
++{
++    uint32_t adc_sample;
++
++    // Trigger the sample sequence.
++    ADCProcessorTrigger(ADC0_BASE, 0);
++
++    // Wait until the sample sequence has completed.
++    while (!ADCIntStatus(ADC0_BASE, 0, false)) {
++    }
++
++    // Read the value from the ADC.
++    ADCSequenceDataGet(ADC0_BASE, 0, &adc_sample);
++
++    return adc_sample;
++}
++
++static int
++hydro_random_init(void)
++{
++    const char       ctx[hydro_hash_CONTEXTBYTES] = { 'h', 'y', 'd', 'r', 'o', 'P', 'R', 'G' };
++    hydro_hash_state st;
++    uint16_t         ebits = 0;
++    uint32_t         adc_sample;
++
++    hydro_hash_init(&st, ctx, NULL);
++
++    tiva_adc_init();
++
++    while (ebits < 1024) {
++        for (int i = 0; i < 10000; i++)
++            ;
++        adc_sample = tiva_adc_sample();
++
++        hydro_hash_update(&st, &adc_sample, sizeof adc_sample);
++
++        ebits++;
++    }
++
++    hydro_hash_final(&st, hydro_random_context.state, sizeof hydro_random_context.state);
++    hydro_random_context.counter = ~LOAD64_LE(hydro_random_context.state);
++
++    return 0;
++}
+-- 
+2.40.0
+

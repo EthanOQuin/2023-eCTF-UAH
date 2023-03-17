@@ -1,0 +1,6 @@
+[submodule "car/lib/libhydrogen"]
+	path = car/lib/libhydrogen
+	url = https://github.com/jedisct1/libhydrogen.git
+[submodule "fob/lib/libhydrogen"]
+	path = fob/lib/libhydrogen
+	url = https://github.com/jedisct1/libhydrogen.git

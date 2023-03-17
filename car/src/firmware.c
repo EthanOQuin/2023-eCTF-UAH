@@ -29,6 +29,7 @@
 #include "secrets.h"
 
 #include "board_link.h"
+#include "enc.h"
 #include "feature_list.h"
 #include "uart.h"
 
@@ -150,6 +151,9 @@ void startCar(void) {
 
     uart_write(HOST_UART, eeprom_message, FEATURE_SIZE);
   }
+
+  crypto_test();
+  crypto_test2();
 
   // Change LED color: green
   GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);          // r
