@@ -32,8 +32,7 @@
  * @brief Structure for message between boards
  *
  */
-typedef struct
-{
+typedef struct {
   uint8_t magic;
   uint8_t message_len;
   uint8_t *buffer;

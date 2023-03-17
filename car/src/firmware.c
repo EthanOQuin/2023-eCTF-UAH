@@ -81,7 +81,6 @@ int main(void) {
   setup_board_link();
 
   while (true) {
-
     unlockCar();
   }
 }
