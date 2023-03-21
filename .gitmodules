@@ -1,6 +1,12 @@
 [submodule "car/lib/libhydrogen"]
 	path = car/lib/libhydrogen
-	url = https://github.com/jedisct1/libhydrogen.git
+	url = https://github.com/EthanOQuin/libhydrogen.git
 [submodule "fob/lib/libhydrogen"]
 	path = fob/lib/libhydrogen
-	url = https://github.com/jedisct1/libhydrogen.git
+	url = https://github.com/EthanOQuin/libhydrogen.git
+[submodule "host_tools/lib/libhydrogen"]
+	path = host_tools/lib/libhydrogen
+	url = https://github.com/EthanOQuin/libhydrogen.git
+[submodule "deployment/lib/libhydrogen"]
+	path = deployment/lib/libhydrogen
+	url = https://github.com/EthanOQuin/libhydrogen.git

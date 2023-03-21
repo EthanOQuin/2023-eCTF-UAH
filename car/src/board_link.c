@@ -26,6 +26,10 @@
 
 #include "board_link.h"
 
+#include "hydrogen.h"
+
+uint8_t message_key[hydro_secretbox_KEYBYTES]; // TODO: add pregenerated key
+
 /**
  * @brief Set the up board link object
  *
@@ -51,29 +55,39 @@ void setup_board_link(void) {
 }
 
 /**
- * @brief Send a message between boards
+ * @brief Send an encrypted message between boards
  *
  * @param message pointer to message to send
  * @return uint32_t the number of bytes sent
  */
 uint32_t send_board_message(MESSAGE_PACKET *message) {
+  const char context[] = "boardmsg";
+  uint8_t ciphertext[hydro_secretbox_HEADERBYTES + MESSAGE_MAX_LENGTH];
+  uint32_t ciphertext_len = hydro_secretbox_HEADERBYTES + message->message_len;
+
   UARTCharPut(BOARD_UART, message->magic);
   UARTCharPut(BOARD_UART, message->message_len);
 
-  for (int i = 0; i < message->message_len; i++) {
-    UARTCharPut(BOARD_UART, message->buffer[i]);
+  hydro_secretbox_encrypt(ciphertext, message->buffer, message->message_len,
+                          message->magic, context, message_key);
+
+  for (int i = 0; i < ciphertext_len; i++) {
+    UARTCharPut(BOARD_UART, ciphertext[i]);
   }
 
-  return message->message_len;
+  return ciphertext_len;
 }
 
 /**
- * @brief Receive a message between boards
+ * @brief Receive an encrypted message between boards
  *
  * @param message pointer to message where data will be received
  * @return uint32_t the number of bytes received - 0 for error
  */
 uint32_t receive_board_message(MESSAGE_PACKET *message) {
+  const char context[] = "boardmsg";
+  uint8_t ciphertext[hydro_secretbox_HEADERBYTES + MESSAGE_MAX_LENGTH];
+
   message->magic = (uint8_t)UARTCharGet(BOARD_UART);
 
   if (message->magic == 0) {
@@ -82,8 +96,15 @@ uint32_t receive_board_message(MESSAGE_PACKET *message) {
 
   message->message_len = (uint8_t)UARTCharGet(BOARD_UART);
 
-  for (int i = 0; i < message->message_len; i++) {
-    message->buffer[i] = (uint8_t)UARTCharGet(BOARD_UART);
+  uint32_t ciphertext_len = hydro_secretbox_HEADERBYTES + message->message_len;
+
+  for (int i = 0; i < ciphertext_len; i++) {
+    ciphertext[i] = (uint8_t)UARTCharGet(BOARD_UART);
+  }
+
+  if (hydro_secretbox_decrypt(message, ciphertext, ciphertext_len,
+                              message->magic, context, message_key)) {
+    return 0;
   }
 
   return message->message_len;
