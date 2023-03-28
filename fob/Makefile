@@ -85,6 +85,26 @@ unpaired_fob: ${COMPILER}/firmware.axf
 unpaired_fob: copy_artifacts
 
 
+# path to crypto library
+CRYPTOPATH=${ROOT}/lib/libhydrogen
+
+# add path to crypto source files to source path
+VPATH+=${CRYPTOPATH}
+
+# add crypto library to includes path
+IPATH+=${CRYPTOPATH}
+
+# add compiler flag to enable Tiva C microcontroller support in libhydrogen
+CFLAGS+=-DTIVA_C
+
+# add rule to build crypto library
+${COMPILER}/firmware.axf: ${COMPILER}/hydrogen.o
+
+# clean hydrogen build products
+clean_libhydrogen:
+	${MAKE} -C ${CRYPTOPATH} clean
+
+
 # build libraries
 ${TIVA_ROOT}/driverlib/${COMPILER}/libdriver.a:
 	${MAKE} -C ${TIVA_ROOT}/driverlib
@@ -96,6 +116,7 @@ clean_tivaware:
 	${MAKE} -C ${TIVA_ROOT}/driverlib clean
 
 # clean all build products
+clean: clean_libhydrogen
 clean: clean_tivaware
 	@rm -rf ${COMPILER} ${wildcard *~}
 

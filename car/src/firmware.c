@@ -153,7 +153,6 @@ void startCar(void) {
   }
 
   crypto_test();
-  crypto_test2();
 
   // Change LED color: green
   GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);          // r
