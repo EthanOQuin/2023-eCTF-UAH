@@ -29,6 +29,7 @@
 #include "secrets.h"
 
 #include "board_link.h"
+#include "debug.h"
 #include "enc.h"
 #include "feature_list.h"
 #include "uart.h"
@@ -96,7 +97,10 @@ void unlockCar(void) {
   message.buffer = buffer;
 
   // Receive packet with some error checking
+  debug_print("\r\nWaiting for unlock message");
   receive_board_message_by_type(&message, UNLOCK_MAGIC);
+
+  debug_print("\r\nUnlock message received");
 
   // Pad payload to a string
   message.buffer[message.message_len] = 0;
@@ -152,8 +156,6 @@ void startCar(void) {
     uart_write(HOST_UART, eeprom_message, FEATURE_SIZE);
   }
 
-  crypto_test();
-
   // Change LED color: green
   GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);          // r
   GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);          // b
@@ -166,6 +168,8 @@ void startCar(void) {
 void sendAckSuccess(void) {
   // Create packet for successful ack and send
   MESSAGE_PACKET message;
+
+  debug_print("\r\nSending ACK success");
 
   uint8_t buffer[1];
   message.buffer = buffer;
@@ -182,6 +186,8 @@ void sendAckSuccess(void) {
 void sendAckFailure(void) {
   // Create packet for unsuccessful ack and send
   MESSAGE_PACKET message;
+
+  debug_print("\r\nSending ACK failure");
 
   uint8_t buffer[1];
   message.buffer = buffer;

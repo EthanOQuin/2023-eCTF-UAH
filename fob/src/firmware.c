@@ -30,6 +30,8 @@
 #include "secrets.h"
 
 #include "board_link.h"
+#include "debug.h"
+#include "enc.h"
 #include "feature_list.h"
 #include "uart.h"
 
@@ -171,8 +173,12 @@ int main(void) {
         ;
       debounce_sw_state = GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4);
       if (debounce_sw_state == current_sw_state) {
+        debug_print("\r\nUnlocking car");
         unlockCar(&fob_state_ram);
+
+        debug_print("\r\nWaiting for ack");
         if (receiveAck()) {
+          debug_print("\r\nAck received, starting car");
           startCar(&fob_state_ram);
         }
       }
@@ -312,6 +318,8 @@ uint8_t receiveAck() {
   uint8_t buffer[255];
   message.buffer = buffer;
   receive_board_message_by_type(&message, ACK_MAGIC);
+
+  debug_print("\r\nReceiving ACK");
 
   return message.buffer[0];
 }
