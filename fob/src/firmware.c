@@ -64,6 +64,7 @@ typedef struct {
   uint8_t car_id[8];
   uint8_t num_active;
   uint8_t features[NUM_FEATURES];
+  uint8_t signatures[hydro_sign_BYTES][NUM_FEATURES];
 } FEATURE_DATA;
 
 // Defines a struct for storing the state in flash
