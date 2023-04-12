@@ -100,8 +100,6 @@ uint32_t receive_board_message(MESSAGE_PACKET *message) {
 
   memset(message_key, 0x00, hydro_secretbox_KEYBYTES);
 
-  debug_print("\r\nReceiving board message");
-
   message->magic = (uint8_t)UARTCharGet(BOARD_UART);
 
   if (message->magic == 0) {

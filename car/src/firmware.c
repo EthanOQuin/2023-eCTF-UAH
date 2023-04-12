@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "hydrogen.h"
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
 
@@ -48,7 +49,8 @@ typedef struct {
 #define UNLOCK_EEPROM_SIZE 64
 
 /*** Function definitions ***/
-// Core functions - unlockCar and startCar
+// Core functions - performHandshake, unlockCar, and startCar
+uint32_t performHandshake(void);
 void unlockCar(void);
 void startCar(void);
 
@@ -88,6 +90,34 @@ int main(void) {
 }
 
 /**
+ * @brief Function implementing simple handshake between car and fob. Returns
+ * nonce to be used when processing unlock packet.
+ */
+uint32_t performHandshake(void) {
+  // Create a message struct variable for receiving data
+  MESSAGE_PACKET message;
+  uint8_t buffer[256];
+  message.buffer = buffer;
+
+  debug_print("\r\nWaiting for handshake request");
+
+  receive_board_message_by_type(&message, HANDSHAKE_MAGIC);
+
+  debug_print("\r\nHandshake request received, returning handshake packet");
+
+  // Nonce to be used in unlock request
+  uint32_t nonce = hydro_random_u32();
+  memcpy(&(message.buffer[0]), &nonce, 4);
+
+  message.message_len = 4;
+  message.magic = HANDSHAKE_MAGIC;
+
+  send_board_message(&message);
+
+  return nonce;
+}
+
+/**
  * @brief Function that handles unlocking of car
  */
 void unlockCar(void) {
@@ -96,17 +126,21 @@ void unlockCar(void) {
   uint8_t buffer[256];
   message.buffer = buffer;
 
+  // Perform handshake to share nonce between car and fob
+  uint32_t nonce = performHandshake();
+
   // Receive packet with some error checking
   debug_print("\r\nWaiting for unlock message");
+
   receive_board_message_by_type(&message, UNLOCK_MAGIC);
 
   debug_print("\r\nUnlock message received");
 
-  // Pad payload to a string
-  message.buffer[message.message_len] = 0;
+  uint32_t received_nonce;
+  memcpy(&received_nonce, &(message.buffer[0]), 4);
 
-  // If the data transfer is the password, unlock
-  if (!strcmp((char *)(message.buffer), (char *)pass)) {
+  // If the data transfer is the nonce, unlock
+  if (received_nonce == nonce) {
     uint8_t eeprom_message[64];
     // Read last 64B of EEPROM
     EEPROMRead((uint32_t *)eeprom_message, UNLOCK_EEPROM_LOC,

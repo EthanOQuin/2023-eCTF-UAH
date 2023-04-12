@@ -75,6 +75,7 @@ typedef struct {
 // Core functions - all functionality supported by fob
 void saveFobState(FLASH_DATA *flash_data);
 void pairFob(FLASH_DATA *fob_state_ram);
+uint32_t performHandshake(void);
 void unlockCar(FLASH_DATA *fob_state_ram);
 void enableFeature(FLASH_DATA *fob_state_ram);
 void startCar(FLASH_DATA *fob_state_ram);
@@ -268,6 +269,36 @@ void enableFeature(FLASH_DATA *fob_state_ram) {
 }
 
 /**
+ * @brief Function implementing simple handshake between fob and car. Returns
+ * nonce to be used when processing unlock packet.
+ */
+uint32_t performHandshake(void) {
+  // Create a message struct variable for receiving data
+  MESSAGE_PACKET message;
+  uint8_t buffer[256];
+  message.buffer = buffer;
+
+  debug_print("\r\nSending handshake request");
+
+  message.magic = HANDSHAKE_MAGIC;
+  message.message_len = 0;
+
+  send_board_message(&message);
+
+  debug_print("\r\nWaiting for response packet");
+
+  receive_board_message_by_type(&message, HANDSHAKE_MAGIC);
+
+  debug_print("\r\nHandshake response received");
+
+  uint32_t nonce;
+
+  memcpy(&nonce, &(message.buffer[0]), 4);
+
+  return nonce;
+}
+
+/**
  * @brief Function that handles the fob unlocking a car
  *
  * @param fob_state_ram pointer to the current fob state in ram
@@ -275,9 +306,18 @@ void enableFeature(FLASH_DATA *fob_state_ram) {
 void unlockCar(FLASH_DATA *fob_state_ram) {
   if (fob_state_ram->paired == FLASH_PAIRED) {
     MESSAGE_PACKET message;
-    message.message_len = 6;
+    uint8_t buffer[256];
+    message.buffer = buffer;
+
+    uint32_t nonce = performHandshake();
+
+    memcpy(&(message.buffer[0]), &nonce, 4);
+
+    debug_print("\r\nSending unlock message");
+
+    message.message_len = 4;
     message.magic = UNLOCK_MAGIC;
-    message.buffer = fob_state_ram->pair_info.password;
+
     send_board_message(&message);
   }
 }
