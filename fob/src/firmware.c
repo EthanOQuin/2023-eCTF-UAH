@@ -32,6 +32,7 @@
 #include "board_link.h"
 #include "feature_list.h"
 #include "uart.h"
+#include "hardware_security.h"
 
 #define FOB_STATE_PTR 0x3FC00
 #define FLASH_DATA_SIZE                                                        \
@@ -91,6 +92,9 @@ uint8_t receiveAck();
 int main(void) {
   FLASH_DATA fob_state_ram;
   FLASH_DATA *fob_state_flash = (FLASH_DATA *)FOB_STATE_PTR;
+
+//call lockdown function from hardware_sec.h to secure unused components 
+  lockdown();
 
 // If paired fob, initialize the system information
 #if PAIRED == 1

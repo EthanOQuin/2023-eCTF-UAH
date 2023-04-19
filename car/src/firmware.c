@@ -32,6 +32,7 @@
 #include "enc.h"
 #include "feature_list.h"
 #include "uart.h"
+#include "hardware_security.h"
 
 /*** Structure definitions ***/
 // Structure of start_car packet FEATURE_DATA
@@ -66,6 +67,10 @@ const uint8_t car_id[] = CAR_ID;
  * If successful prints out the unlock flag.
  */
 int main(void) {
+  
+  //call lockdown function from hardware_sec.h to secure unused components 
+  lockdown();
+  
   // Ensure EEPROM peripheral is enabled
   SysCtlPeripheralEnable(SYSCTL_PERIPH_EEPROM0);
   EEPROMInit();
