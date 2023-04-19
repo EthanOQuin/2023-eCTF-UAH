@@ -1,7 +1,6 @@
 #ifndef hardware_security
 #define hardware_security
 
-#include "inc/tm4c123gh6pm.h"  // Include the TM4C123G register definitions
 #include "driverlib/sysctl.h"  // Include the TivaWare system control API
 
 // Define the base address and size of the memory region to be secured
