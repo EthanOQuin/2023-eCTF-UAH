@@ -154,7 +154,9 @@ void unlockCar(void) {
     EEPROMRead((uint32_t *)eeprom_message, UNLOCK_EEPROM_LOC,
                UNLOCK_EEPROM_SIZE);
 
+    debug_print("\r\n\n==== Begin Unlock Message =====\r\n");
     uart_write(HOST_UART, eeprom_message, UNLOCK_EEPROM_SIZE);
+    debug_print("\r\n==== End Unlock Message =====\n");
 
     sendAckSuccess();
 
@@ -186,6 +188,7 @@ void startCar(void) {
   }
 
   // Print out features for all active features
+  debug_print("\r\n\n==== Begin Feature Message =====");
   for (int i = 0; i < feature_info->num_active; i++) {
     uint8_t eeprom_message[64];
 
@@ -197,8 +200,11 @@ void startCar(void) {
 
     EEPROMRead((uint32_t *)eeprom_message, FEATURE_END - offset, FEATURE_SIZE);
 
+    debug_print("\r\n");
     uart_write(HOST_UART, eeprom_message, FEATURE_SIZE);
   }
+
+  debug_print("\r\n==== End Feature Message =====\n");
 
   // Change LED color: green
   GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);          // r
