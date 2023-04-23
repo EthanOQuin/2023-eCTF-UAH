@@ -83,6 +83,9 @@ void startCar(FLASH_DATA *fob_state_ram);
 // Helper functions - receive ack message
 uint8_t receiveAck();
 
+// Message key
+uint8_t message_key[hydro_secretbox_KEYBYTES]; // TODO: add pregenerated key
+
 /**
  * @brief Main function for the fob example
  *
@@ -95,7 +98,10 @@ int main(void) {
   FLASH_DATA fob_state_ram;
   FLASH_DATA *fob_state_flash = (FLASH_DATA *)FOB_STATE_PTR;
 
-// If paired fob, initialize the system information
+  // Initialize UART (early for debugging)
+  uart_init();
+
+// If paired fob, initialize the system information and save to flash
 #if PAIRED == 1
   if (fob_state_flash->paired == FLASH_UNPAIRED) {
     strcpy((char *)(fob_state_ram.pair_info.password), PASSWORD);
@@ -111,7 +117,15 @@ int main(void) {
 #endif
 
   if (fob_state_flash->paired == FLASH_PAIRED) {
+    debug_print("\r\nFob paired to car, loading data");
     memcpy(&fob_state_ram, fob_state_flash, FLASH_DATA_SIZE);
+
+    memset(message_key, 0x55,
+           hydro_secretbox_KEYBYTES); // TODO: replace with actual key
+  } else {
+    debug_print("\r\nFob not paired to car");
+    memset(message_key, 0x00,
+           hydro_secretbox_KEYBYTES); // TODO: replace with actual key
   }
 
   // This will run on first boot to initialize features
@@ -119,9 +133,6 @@ int main(void) {
     fob_state_ram.feature_info.num_active = 0;
     saveFobState(&fob_state_ram);
   }
-
-  // Initialize UART
-  uart_init();
 
   // Initialize board link UART
   setup_board_link();
@@ -194,7 +205,9 @@ int main(void) {
  * @param fob_state_ram pointer to the current fob state in ram
  */
 void pairFob(FLASH_DATA *fob_state_ram) {
+  debug_print("\r\n\n---- Pair Fob ----\n");
   MESSAGE_PACKET message;
+
   // Start pairing transaction - fob is already paired
   if (fob_state_ram->paired == FLASH_PAIRED) {
     int16_t bytes_read;
@@ -236,6 +249,7 @@ void pairFob(FLASH_DATA *fob_state_ram) {
  * @param fob_state_ram pointer to the current fob state in ram
  */
 void enableFeature(FLASH_DATA *fob_state_ram) {
+  debug_print("\r\n\n---- Enable Feature ----\n");
   if (fob_state_ram->paired == FLASH_PAIRED) {
     uint8_t uart_buffer[20];
     uart_readline(HOST_UART, uart_buffer);
@@ -273,6 +287,7 @@ void enableFeature(FLASH_DATA *fob_state_ram) {
  * nonce to be used when processing unlock packet.
  */
 uint32_t performHandshake(void) {
+  debug_print("\r\nPerforming Handshake");
   // Create a message struct variable for receiving data
   MESSAGE_PACKET message;
   uint8_t buffer[256];
@@ -304,12 +319,15 @@ uint32_t performHandshake(void) {
  * @param fob_state_ram pointer to the current fob state in ram
  */
 void unlockCar(FLASH_DATA *fob_state_ram) {
+  debug_print("\r\n\n---- Begin Unlock ----\n");
   if (fob_state_ram->paired == FLASH_PAIRED) {
     MESSAGE_PACKET message;
     uint8_t buffer[256];
     message.buffer = buffer;
 
     uint32_t nonce = performHandshake();
+
+    debug_print("\r\n\n---- Send Unlock ----\n");
 
     memcpy(&(message.buffer[0]), &nonce, 4);
 
@@ -328,6 +346,7 @@ void unlockCar(FLASH_DATA *fob_state_ram) {
  * @param fob_state_ram pointer to the current fob state in ram
  */
 void startCar(FLASH_DATA *fob_state_ram) {
+  debug_print("\r\n\n---- Start ----\n");
   if (fob_state_ram->paired == FLASH_PAIRED) {
     MESSAGE_PACKET message;
     message.magic = START_MAGIC;

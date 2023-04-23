@@ -62,6 +62,9 @@ void sendAckFailure(void);
 const uint8_t pass[] = PASSWORD;
 const uint8_t car_id[] = CAR_ID;
 
+// Message key
+uint8_t message_key[hydro_secretbox_KEYBYTES]; // TODO: add pregenerated key
+
 /**
  * @brief Main function for the car example
  *
@@ -83,6 +86,9 @@ int main(void) {
 
   // Initialize board link UART
   setup_board_link();
+
+  memset(message_key, 0x55,
+         hydro_secretbox_KEYBYTES); // TODO: replace with actual key
 
   while (true) {
     unlockCar();
@@ -126,6 +132,8 @@ void unlockCar(void) {
   uint8_t buffer[256];
   message.buffer = buffer;
 
+  debug_print("\r\n\n---- Unlock ----\n");
+
   // Perform handshake to share nonce between car and fob
   uint32_t nonce = performHandshake();
 
@@ -134,7 +142,7 @@ void unlockCar(void) {
 
   receive_board_message_by_type(&message, UNLOCK_MAGIC);
 
-  debug_print("\r\nUnlock message received");
+  debug_print("\r\nUnlock message received\r\n\n");
 
   uint32_t received_nonce;
   memcpy(&received_nonce, &(message.buffer[0]), 4);
@@ -164,6 +172,8 @@ void startCar(void) {
   MESSAGE_PACKET message;
   uint8_t buffer[256];
   message.buffer = buffer;
+
+  debug_print("\r\n\n---- Start ----\n");
 
   // Receive start message
   receive_board_message_by_type(&message, START_MAGIC);

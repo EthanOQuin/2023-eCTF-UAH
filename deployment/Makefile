@@ -19,6 +19,7 @@ __check_defined = \
 all: gen_key
 	$(call check_defined SECRETS_DIR)
 	/tmp/gen_key > ${SECRETS_DIR}/key.txt
+	echo "SECRET!" > ${SECRETS_DIR}/global_secrets.txt
 
 LIBPATH=./lib/libhydrogen
 

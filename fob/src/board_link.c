@@ -29,7 +29,8 @@
 
 #include "hydrogen.h"
 
-uint8_t message_key[hydro_secretbox_KEYBYTES]; // TODO: add pregenerated key
+extern uint8_t
+    message_key[hydro_secretbox_KEYBYTES]; // TODO: add pregenerated key
 
 /**
  * @brief Set the up board link object
@@ -62,29 +63,40 @@ void setup_board_link(void) {
  * @return uint32_t the number of bytes sent
  */
 uint32_t send_board_message(MESSAGE_PACKET *message) {
-  const char context[] = "boardmsg";
-  uint8_t ciphertext[hydro_secretbox_HEADERBYTES + MESSAGE_MAX_LENGTH];
-  uint32_t ciphertext_len = hydro_secretbox_HEADERBYTES + message->message_len;
-
-  memset(message_key, 0x00, hydro_secretbox_KEYBYTES);
-
   debug_print("\r\nSending board message");
 
   UARTCharPut(BOARD_UART, message->magic);
   UARTCharPut(BOARD_UART, message->message_len);
 
-  debug_print("\r\nEncrypting message contents");
+  // If message is a pairing packet, send unencrypted. Otherwise, encrypt
+  // message.
+  if (message->magic == PAIR_MAGIC) {
+    debug_print("\r\nSending unencrypted pairing message");
 
-  hydro_secretbox_encrypt(ciphertext, message->buffer, message->message_len, 0,
-                          context, message_key);
+    for (int i = 0; i < message->message_len; i++) {
+      UARTCharPut(BOARD_UART, message->buffer[i]);
+    }
 
-  for (int i = 0; i < ciphertext_len; i++) {
-    UARTCharPut(BOARD_UART, ciphertext[i]);
+    return message->message_len;
+  } else {
+    const char context[] = "boardmsg";
+    uint8_t ciphertext[hydro_secretbox_HEADERBYTES + MESSAGE_MAX_LENGTH];
+    uint32_t ciphertext_len =
+        hydro_secretbox_HEADERBYTES + message->message_len;
+
+    debug_print("\r\nEncrypting message contents");
+
+    hydro_secretbox_encrypt(ciphertext, message->buffer, message->message_len,
+                            0, context, message_key);
+
+    for (int i = 0; i < ciphertext_len; i++) {
+      UARTCharPut(BOARD_UART, ciphertext[i]);
+    }
+
+    debug_print("\r\nMessage sent");
+
+    return ciphertext_len;
   }
-
-  debug_print("\r\nMessage sent");
-
-  return ciphertext_len;
 }
 
 /**
@@ -95,11 +107,6 @@ uint32_t send_board_message(MESSAGE_PACKET *message) {
  * corrupted or tampered message
  */
 uint32_t receive_board_message(MESSAGE_PACKET *message) {
-  const char context[] = "boardmsg";
-  uint8_t ciphertext[hydro_secretbox_HEADERBYTES + MESSAGE_MAX_LENGTH];
-
-  memset(message_key, 0x00, hydro_secretbox_KEYBYTES);
-
   message->magic = (uint8_t)UARTCharGet(BOARD_UART);
 
   if (message->magic == 0) {
@@ -108,20 +115,33 @@ uint32_t receive_board_message(MESSAGE_PACKET *message) {
 
   message->message_len = (uint8_t)UARTCharGet(BOARD_UART);
 
-  uint32_t ciphertext_len = hydro_secretbox_HEADERBYTES + message->message_len;
+  if (message->magic == PAIR_MAGIC) {
+    debug_print("\r\nReceiving unencrypted pairing message");
 
-  for (int i = 0; i < ciphertext_len; i++) {
-    ciphertext[i] = (uint8_t)UARTCharGet(BOARD_UART);
+    for (int i = 0; i < message->message_len; i++) {
+      message->buffer[i] = (uint8_t)UARTCharGet(BOARD_UART);
+    }
+  } else {
+    const char context[] = "boardmsg";
+    uint8_t ciphertext[hydro_secretbox_HEADERBYTES + MESSAGE_MAX_LENGTH];
+
+    uint32_t ciphertext_len =
+        hydro_secretbox_HEADERBYTES + message->message_len;
+
+    for (int i = 0; i < ciphertext_len; i++) {
+      ciphertext[i] = (uint8_t)UARTCharGet(BOARD_UART);
+    }
+
+    debug_print("\r\nDecrypting board message");
+
+    if (hydro_secretbox_decrypt(message->buffer, ciphertext, ciphertext_len, 0,
+                                context, message_key)) {
+      debug_print("\r\nERROR: Invalid message received");
+      return -1;
+    }
+
+    debug_print("\r\nMessage received");
   }
-
-  debug_print("\r\nDecrypting board message");
-
-  if (hydro_secretbox_decrypt(message->buffer, ciphertext, ciphertext_len, 0,
-                              context, message_key)) {
-    return -1;
-  }
-
-  debug_print("\r\nMessage received");
 
   return message->message_len;
 }
