@@ -51,14 +51,14 @@ paired_fob_arg_check:
 	$(call check_defined, CAR_ID PAIR_PIN SECRETS_DIR BIN_PATH ELF_PATH EEPROM_PATH)
 
 paired_fob_gen_secret:
-	python3 gen_secret.py --car-id ${CAR_ID} --pair-pin ${PAIR_PIN} --secret-key-file ${SECRETS_DIR}/secret_key.txt --header-file inc/secrets.h --paired
+	python3 gen_secret.py --car-id ${CAR_ID} --pair-pin ${PAIR_PIN} --secret-key-file ${SECRETS_DIR}/secret_key.txt --signing-public-key-file ${SECRETS_DIR}/signing_public_key.txt --header-file inc/secrets.h --paired
 
 
 unpaired_fob_arg_check:
 	$(call check_defined, SECRETS_DIR BIN_PATH ELF_PATH EEPROM_PATH)
 
 unpaired_fob_gen_secret:
-	python3 gen_secret.py --header-file inc/secrets.h
+	python3 gen_secret.py --signing-public-key-file ${SECRETS_DIR}/signing_public_key.txt --header-file inc/secrets.h
 
 
 ################ END fob customization ################

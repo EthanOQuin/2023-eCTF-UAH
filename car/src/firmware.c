@@ -38,9 +38,16 @@
 /*** Structure definitions ***/
 // Structure of start_car packet FEATURE_DATA
 typedef struct {
-  uint8_t car_id[8];
+  uint32_t car_id;
+  uint8_t feature;
+  uint8_t signature[hydro_sign_BYTES];
+} __attribute__((packed)) ENABLE_PACKET;
+
+typedef struct {
+  uint32_t car_id;
   uint8_t num_active;
   uint8_t features[NUM_FEATURES];
+  uint8_t signatures[NUM_FEATURES][hydro_sign_BYTES];
 } FEATURE_DATA;
 
 /*** Macro Definitions ***/
@@ -59,10 +66,13 @@ void sendAckSuccess(void);
 void sendAckFailure(void);
 
 // Declare Car ID
-const uint8_t car_id[] = CAR_ID;
+const uint32_t car_id = CAR_ID;
 
-// Message key
+// Inter-board message encryption key
 uint8_t *message_key = MESSAGE_KEY;
+
+// Feature package verification key
+uint8_t *feature_verification_key = SIGNING_PUBLIC_KEY;
 
 /**
  * @brief Main function for the car example
@@ -86,8 +96,8 @@ int main(void) {
   // Initialize board link UART
   setup_board_link();
 
-  /* memset(message_key, 0x55, */
-  /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
+  // Initialize libhydrogen
+  hydro_init();
 
   while (true) {
     unlockCar();
@@ -182,9 +192,26 @@ void startCar(void) {
   FEATURE_DATA *feature_info = (FEATURE_DATA *)buffer;
 
   // Verify correct car id
-  if (strcmp((char *)car_id, (char *)feature_info->car_id)) {
+  if (car_id != feature_info->car_id) {
     return;
   }
+
+  // Verify signatures of all active features
+  debug_print("\r\nBegin Feature Verification");
+  ENABLE_PACKET e;
+  e.car_id = car_id;
+  for (int i = 0; i < feature_info->num_active; i++) {
+    e.feature = feature_info->features[i];
+
+    // If feature signature invalid, exit
+    if (hydro_sign_verify(feature_info->signatures[i], &e,
+                          sizeof(e.car_id) + sizeof(e.feature), "feature",
+                          feature_verification_key) != 0) {
+      debug_print("\r\nERROR: Feature verification failed.");
+      return;
+    }
+  }
+  debug_print("\r\nFeature Verification Complete");
 
   // Print out features for all active features
   debug_print("\r\n\n==== Begin Feature Message =====");

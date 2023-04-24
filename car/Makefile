@@ -50,7 +50,7 @@ car_arg_check:
 	$(call check_defined, CAR_ID SECRETS_DIR BIN_PATH ELF_PATH EEPROM_PATH)
 
 gen_secret:
-	python3 gen_secret.py --car-id ${CAR_ID} --secret-key-file ${SECRETS_DIR}/secret_key.txt --header-file inc/secrets.h
+	python3 gen_secret.py --car-id ${CAR_ID} --secret-key-file ${SECRETS_DIR}/secret_key.txt --signing-public-key-file ${SECRETS_DIR}/signing_public_key.txt --header-file inc/secrets.h
 
 ################ END car customization ################
 #######################################################

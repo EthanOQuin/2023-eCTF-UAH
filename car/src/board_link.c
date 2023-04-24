@@ -83,7 +83,7 @@ uint32_t send_board_message(MESSAGE_PACKET *message) {
     uint32_t ciphertext_len =
         hydro_secretbox_HEADERBYTES + message->message_len;
 
-    debug_print("\r\nEncrypting message contents");
+    /* debug_print("\r\nEncrypting message contents"); */
 
     hydro_secretbox_encrypt(ciphertext, message->buffer, message->message_len,
                             0, context, message_key);
@@ -98,7 +98,7 @@ uint32_t send_board_message(MESSAGE_PACKET *message) {
       UARTCharPut(BOARD_UART, ciphertext[i]);
     }
 
-    debug_print("\r\nMessage sent");
+    /* debug_print("\r\nMessage sent"); */
 
     return ciphertext_len;
   }
@@ -121,7 +121,7 @@ uint32_t receive_board_message(MESSAGE_PACKET *message) {
   message->message_len = (uint8_t)UARTCharGet(BOARD_UART);
 
   if (message->magic == PAIR_MAGIC) {
-    debug_print("\r\nReceiving unencrypted pairing message");
+    /* debug_print("\r\nReceiving unencrypted pairing message"); */
 
     for (int i = 0; i < message->message_len; i++) {
       message->buffer[i] = (uint8_t)UARTCharGet(BOARD_UART);
@@ -137,7 +137,7 @@ uint32_t receive_board_message(MESSAGE_PACKET *message) {
       ciphertext[i] = (uint8_t)UARTCharGet(BOARD_UART);
     }
 
-    debug_print("\r\nDecrypting board message");
+    /* debug_print("\r\nDecrypting board message"); */
 
     if (hydro_secretbox_decrypt(message->buffer, ciphertext, ciphertext_len, 0,
                                 context, message_key)) {
@@ -145,7 +145,7 @@ uint32_t receive_board_message(MESSAGE_PACKET *message) {
       return -1;
     }
 
-    debug_print("\r\nMessage received");
+    /* debug_print("\r\nMessage received"); */
   }
 
   return message->message_len;
