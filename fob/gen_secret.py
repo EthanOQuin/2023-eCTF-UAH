@@ -38,7 +38,6 @@ def main():
             f.write(f'#define PAIR_PIN "{args.pair_pin}"\n')
             f.write(f'#define CAR_ID "{args.car_id}"\n')
             f.write(f'const uint8_t MESSAGE_KEY[hydro_secretbox_KEYBYTES] = {{{secret_key}}};\n\n')
-            f.write('#define PASSWORD "unlock"\n\n')
             f.write("#endif\n")
     else:
         # Write to header file
@@ -51,7 +50,6 @@ def main():
             f.write('#define PAIR_PIN "000000"\n')
             f.write('#define CAR_ID "000000"\n')
             f.write('const uint8_t MESSAGE_KEY[hydro_secretbox_KEYBYTES] = {{0x00}};\n\n')
-            f.write('#define PASSWORD "unlock"\n\n')
             f.write("#endif\n")
 
 

@@ -37,7 +37,6 @@ def main():
         f.write("#include <stdint.h>\n")
         f.write("#include \"hydrogen.h\"\n\n")
         f.write(f'#define CAR_ID "{args.car_id}"\n\n')
-        f.write('#define PASSWORD "unlock"\n\n')
         f.write(f'const uint8_t MESSAGE_KEY[hydro_secretbox_KEYBYTES] = {{{secret_key}}};\n\n')
         f.write("#endif\n")
 

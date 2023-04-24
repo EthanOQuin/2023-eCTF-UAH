@@ -55,7 +55,6 @@ typedef struct {
 // Defines a struct for the format of a pairing message
 typedef struct {
   uint8_t car_id[8];
-  uint8_t password[8];
   uint8_t pin[8];
   uint8_t message_key[hydro_secretbox_KEYBYTES];
 } PAIR_PACKET;
@@ -108,7 +107,6 @@ int main(void) {
 // If paired fob, initialize the system information and save to flash
 #if PAIRED == 1
   if (fob_state_flash->paired == FLASH_UNPAIRED) {
-    strcpy((char *)(fob_state_ram.pair_info.password), PASSWORD);
     strcpy((char *)(fob_state_ram.pair_info.pin), PAIR_PIN);
     strcpy((char *)(fob_state_ram.pair_info.car_id), CAR_ID);
     strcpy((char *)(fob_state_ram.feature_info.car_id), CAR_ID);
