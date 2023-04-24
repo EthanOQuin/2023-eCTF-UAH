@@ -27,9 +27,13 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/timer.h"
 
+#include "hydrogen.h"
+
 #include "secrets.h"
 
 #include "board_link.h"
+#include "debug.h"
+#include "enc.h"
 #include "feature_list.h"
 #include "uart.h"
 
@@ -51,8 +55,8 @@ typedef struct {
 // Defines a struct for the format of a pairing message
 typedef struct {
   uint8_t car_id[8];
-  uint8_t password[8];
   uint8_t pin[8];
+  uint8_t message_key[hydro_secretbox_KEYBYTES];
 } PAIR_PACKET;
 
 // Defines a struct for the format of start message
@@ -67,18 +71,23 @@ typedef struct {
   uint8_t paired;
   PAIR_PACKET pair_info;
   FEATURE_DATA feature_info;
+  uint8_t padding[3];
 } FLASH_DATA;
 
 /*** Function definitions ***/
 // Core functions - all functionality supported by fob
 void saveFobState(FLASH_DATA *flash_data);
 void pairFob(FLASH_DATA *fob_state_ram);
+uint32_t performHandshake(void);
 void unlockCar(FLASH_DATA *fob_state_ram);
 void enableFeature(FLASH_DATA *fob_state_ram);
 void startCar(FLASH_DATA *fob_state_ram);
 
 // Helper functions - receive ack message
 uint8_t receiveAck();
+
+// Message key
+uint8_t *message_key = MESSAGE_KEY;
 
 /**
  * @brief Main function for the fob example
@@ -92,13 +101,19 @@ int main(void) {
   FLASH_DATA fob_state_ram;
   FLASH_DATA *fob_state_flash = (FLASH_DATA *)FOB_STATE_PTR;
 
-// If paired fob, initialize the system information
+  // Initialize UART (early for debugging)
+  uart_init();
+
+// If paired fob, initialize the system information and save to flash
 #if PAIRED == 1
   if (fob_state_flash->paired == FLASH_UNPAIRED) {
-    strcpy((char *)(fob_state_ram.pair_info.password), PASSWORD);
     strcpy((char *)(fob_state_ram.pair_info.pin), PAIR_PIN);
     strcpy((char *)(fob_state_ram.pair_info.car_id), CAR_ID);
     strcpy((char *)(fob_state_ram.feature_info.car_id), CAR_ID);
+
+    memcpy(&fob_state_ram.pair_info.message_key, message_key,
+           hydro_secretbox_KEYBYTES);
+
     fob_state_ram.paired = FLASH_PAIRED;
 
     saveFobState(&fob_state_ram);
@@ -108,7 +123,17 @@ int main(void) {
 #endif
 
   if (fob_state_flash->paired == FLASH_PAIRED) {
+    debug_print("\r\nFob paired to car, loading data");
     memcpy(&fob_state_ram, fob_state_flash, FLASH_DATA_SIZE);
+
+    message_key = fob_state_ram.pair_info.message_key;
+
+    /* memset(message_key, 0x55, */
+    /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
+  } else {
+    debug_print("\r\nFob not paired to car");
+    /* memset(message_key, 0x00, */
+    /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
   }
 
   // This will run on first boot to initialize features
@@ -116,9 +141,6 @@ int main(void) {
     fob_state_ram.feature_info.num_active = 0;
     saveFobState(&fob_state_ram);
   }
-
-  // Initialize UART
-  uart_init();
 
   // Initialize board link UART
   setup_board_link();
@@ -171,8 +193,12 @@ int main(void) {
         ;
       debounce_sw_state = GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4);
       if (debounce_sw_state == current_sw_state) {
+        debug_print("\r\nUnlocking car");
         unlockCar(&fob_state_ram);
+
+        debug_print("\r\nWaiting for ack");
         if (receiveAck()) {
+          debug_print("\r\nAck received, starting car");
           startCar(&fob_state_ram);
         }
       }
@@ -187,7 +213,9 @@ int main(void) {
  * @param fob_state_ram pointer to the current fob state in ram
  */
 void pairFob(FLASH_DATA *fob_state_ram) {
+  debug_print("\r\n\n---- Pair Fob ----\n");
   MESSAGE_PACKET message;
+
   // Start pairing transaction - fob is already paired
   if (fob_state_ram->paired == FLASH_PAIRED) {
     int16_t bytes_read;
@@ -229,6 +257,7 @@ void pairFob(FLASH_DATA *fob_state_ram) {
  * @param fob_state_ram pointer to the current fob state in ram
  */
 void enableFeature(FLASH_DATA *fob_state_ram) {
+  debug_print("\r\n\n---- Enable Feature ----\n");
   if (fob_state_ram->paired == FLASH_PAIRED) {
     uint8_t uart_buffer[20];
     uart_readline(HOST_UART, uart_buffer);
@@ -262,16 +291,59 @@ void enableFeature(FLASH_DATA *fob_state_ram) {
 }
 
 /**
+ * @brief Function implementing simple handshake between fob and car. Returns
+ * nonce to be used when processing unlock packet.
+ */
+uint32_t performHandshake(void) {
+  debug_print("\r\nPerforming Handshake");
+  // Create a message struct variable for receiving data
+  MESSAGE_PACKET message;
+  uint8_t buffer[256];
+  message.buffer = buffer;
+
+  debug_print("\r\nSending handshake request");
+
+  message.magic = HANDSHAKE_MAGIC;
+  message.message_len = 0;
+
+  send_board_message(&message);
+
+  debug_print("\r\nWaiting for response packet");
+
+  receive_board_message_by_type(&message, HANDSHAKE_MAGIC);
+
+  debug_print("\r\nHandshake response received");
+
+  uint32_t nonce;
+
+  memcpy(&nonce, &(message.buffer[0]), 4);
+
+  return nonce;
+}
+
+/**
  * @brief Function that handles the fob unlocking a car
  *
  * @param fob_state_ram pointer to the current fob state in ram
  */
 void unlockCar(FLASH_DATA *fob_state_ram) {
+  debug_print("\r\n\n---- Begin Unlock ----\n");
   if (fob_state_ram->paired == FLASH_PAIRED) {
     MESSAGE_PACKET message;
-    message.message_len = 6;
+    uint8_t buffer[256];
+    message.buffer = buffer;
+
+    uint32_t nonce = performHandshake();
+
+    debug_print("\r\n\n---- Send Unlock ----\n");
+
+    memcpy(&(message.buffer[0]), &nonce, 4);
+
+    debug_print("\r\nSending unlock message");
+
+    message.message_len = 4;
     message.magic = UNLOCK_MAGIC;
-    message.buffer = fob_state_ram->pair_info.password;
+
     send_board_message(&message);
   }
 }
@@ -282,6 +354,7 @@ void unlockCar(FLASH_DATA *fob_state_ram) {
  * @param fob_state_ram pointer to the current fob state in ram
  */
 void startCar(FLASH_DATA *fob_state_ram) {
+  debug_print("\r\n\n---- Start ----\n");
   if (fob_state_ram->paired == FLASH_PAIRED) {
     MESSAGE_PACKET message;
     message.magic = START_MAGIC;
@@ -312,6 +385,8 @@ uint8_t receiveAck() {
   uint8_t buffer[255];
   message.buffer = buffer;
   receive_board_message_by_type(&message, ACK_MAGIC);
+
+  debug_print("\r\nReceiving ACK");
 
   return message.buffer[0];
 }

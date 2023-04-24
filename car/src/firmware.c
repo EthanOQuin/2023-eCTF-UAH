@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "hydrogen.h"
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
 
@@ -29,6 +30,7 @@
 #include "secrets.h"
 
 #include "board_link.h"
+#include "debug.h"
 #include "enc.h"
 #include "feature_list.h"
 #include "uart.h"
@@ -47,7 +49,8 @@ typedef struct {
 #define UNLOCK_EEPROM_SIZE 64
 
 /*** Function definitions ***/
-// Core functions - unlockCar and startCar
+// Core functions - performHandshake, unlockCar, and startCar
+uint32_t performHandshake(void);
 void unlockCar(void);
 void startCar(void);
 
@@ -55,9 +58,11 @@ void startCar(void);
 void sendAckSuccess(void);
 void sendAckFailure(void);
 
-// Declare password
-const uint8_t pass[] = PASSWORD;
+// Declare Car ID
 const uint8_t car_id[] = CAR_ID;
+
+// Message key
+uint8_t *message_key = MESSAGE_KEY;
 
 /**
  * @brief Main function for the car example
@@ -81,9 +86,40 @@ int main(void) {
   // Initialize board link UART
   setup_board_link();
 
+  /* memset(message_key, 0x55, */
+  /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
+
   while (true) {
     unlockCar();
   }
+}
+
+/**
+ * @brief Function implementing simple handshake between car and fob. Returns
+ * nonce to be used when processing unlock packet.
+ */
+uint32_t performHandshake(void) {
+  // Create a message struct variable for receiving data
+  MESSAGE_PACKET message;
+  uint8_t buffer[256];
+  message.buffer = buffer;
+
+  debug_print("\r\nWaiting for handshake request");
+
+  receive_board_message_by_type(&message, HANDSHAKE_MAGIC);
+
+  debug_print("\r\nHandshake request received, returning handshake packet");
+
+  // Nonce to be used in unlock request
+  uint32_t nonce = hydro_random_u32();
+  memcpy(&(message.buffer[0]), &nonce, 4);
+
+  message.message_len = 4;
+  message.magic = HANDSHAKE_MAGIC;
+
+  send_board_message(&message);
+
+  return nonce;
 }
 
 /**
@@ -95,20 +131,31 @@ void unlockCar(void) {
   uint8_t buffer[256];
   message.buffer = buffer;
 
+  debug_print("\r\n\n---- Unlock ----\n");
+
+  // Perform handshake to share nonce between car and fob
+  uint32_t nonce = performHandshake();
+
   // Receive packet with some error checking
+  debug_print("\r\nWaiting for unlock message");
+
   receive_board_message_by_type(&message, UNLOCK_MAGIC);
 
-  // Pad payload to a string
-  message.buffer[message.message_len] = 0;
+  debug_print("\r\nUnlock message received\r\n\n");
 
-  // If the data transfer is the password, unlock
-  if (!strcmp((char *)(message.buffer), (char *)pass)) {
+  uint32_t received_nonce;
+  memcpy(&received_nonce, &(message.buffer[0]), 4);
+
+  // If the data transfer is the nonce, unlock
+  if (received_nonce == nonce) {
     uint8_t eeprom_message[64];
     // Read last 64B of EEPROM
     EEPROMRead((uint32_t *)eeprom_message, UNLOCK_EEPROM_LOC,
                UNLOCK_EEPROM_SIZE);
 
+    debug_print("\r\n\n==== Begin Unlock Message =====\r\n");
     uart_write(HOST_UART, eeprom_message, UNLOCK_EEPROM_SIZE);
+    debug_print("\r\n==== End Unlock Message =====\n");
 
     sendAckSuccess();
 
@@ -127,6 +174,8 @@ void startCar(void) {
   uint8_t buffer[256];
   message.buffer = buffer;
 
+  debug_print("\r\n\n---- Start ----\n");
+
   // Receive start message
   receive_board_message_by_type(&message, START_MAGIC);
 
@@ -138,6 +187,7 @@ void startCar(void) {
   }
 
   // Print out features for all active features
+  debug_print("\r\n\n==== Begin Feature Message =====");
   for (int i = 0; i < feature_info->num_active; i++) {
     uint8_t eeprom_message[64];
 
@@ -149,10 +199,11 @@ void startCar(void) {
 
     EEPROMRead((uint32_t *)eeprom_message, FEATURE_END - offset, FEATURE_SIZE);
 
+    debug_print("\r\n");
     uart_write(HOST_UART, eeprom_message, FEATURE_SIZE);
   }
 
-  crypto_test();
+  debug_print("\r\n==== End Feature Message =====\n");
 
   // Change LED color: green
   GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);          // r
@@ -166,6 +217,8 @@ void startCar(void) {
 void sendAckSuccess(void) {
   // Create packet for successful ack and send
   MESSAGE_PACKET message;
+
+  debug_print("\r\nSending ACK success");
 
   uint8_t buffer[1];
   message.buffer = buffer;
@@ -182,6 +235,8 @@ void sendAckSuccess(void) {
 void sendAckFailure(void) {
   // Create packet for unsuccessful ack and send
   MESSAGE_PACKET message;
+
+  debug_print("\r\nSending ACK failure");
 
   uint8_t buffer[1];
   message.buffer = buffer;

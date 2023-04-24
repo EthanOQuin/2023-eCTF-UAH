@@ -51,7 +51,7 @@ paired_fob_arg_check:
 	$(call check_defined, CAR_ID PAIR_PIN SECRETS_DIR BIN_PATH ELF_PATH EEPROM_PATH)
 
 paired_fob_gen_secret:
-	python3 gen_secret.py --car-id ${CAR_ID} --pair-pin ${PAIR_PIN} --secret-file ${SECRETS_DIR}/car_secrets.json --header-file inc/secrets.h --paired
+	python3 gen_secret.py --car-id ${CAR_ID} --pair-pin ${PAIR_PIN} --secret-key-file ${SECRETS_DIR}/secret_key.txt --header-file inc/secrets.h --paired
 
 
 unpaired_fob_arg_check:
@@ -128,6 +128,7 @@ ${COMPILER}:
 # for each source file that needs to be compiled besides the file that defines `main`
 
 ${COMPILER}/firmware.axf: ${COMPILER}/uart.o
+${COMPILER}/firmware.axf: ${COMPILER}/enc.o
 ${COMPILER}/firmware.axf: ${COMPILER}/board_link.o
 ${COMPILER}/firmware.axf: ${COMPILER}/firmware.o
 ${COMPILER}/firmware.axf: ${COMPILER}/startup_${COMPILER}.o
@@ -136,7 +137,7 @@ ${COMPILER}/firmware.axf: ${TIVA_ROOT}/driverlib/${COMPILER}/libdriver.a
 copy_artifacts:
 	cp ${COMPILER}/firmware.bin ${BIN_PATH}
 	cp ${COMPILER}/firmware.axf ${ELF_PATH}
-	cp ${SECRETS_DIR}/global_secrets.txt ${EEPROM_PATH}
+	# cp ${SECRETS_DIR}/global_secrets.txt ${EEPROM_PATH}
 
 SCATTERgcc_firmware=${TIVA_ROOT}/firmware.ld
 ENTRY_firmware=Firmware_Startup

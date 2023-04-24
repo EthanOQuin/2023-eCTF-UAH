@@ -25,6 +25,11 @@
 #include "driverlib/uart.h"
 
 #include "board_link.h"
+#include "debug.h"
+
+#include "hydrogen.h"
+
+extern uint8_t *message_key;
 
 /**
  * @brief Set the up board link object
@@ -51,27 +56,60 @@ void setup_board_link(void) {
 }
 
 /**
- * @brief Send a message between boards
+ * @brief Send an encrypted message between boards
  *
  * @param message pointer to message to send
  * @return uint32_t the number of bytes sent
  */
 uint32_t send_board_message(MESSAGE_PACKET *message) {
+  debug_print("\r\nSending board message");
+
   UARTCharPut(BOARD_UART, message->magic);
   UARTCharPut(BOARD_UART, message->message_len);
 
-  for (int i = 0; i < message->message_len; i++) {
-    UARTCharPut(BOARD_UART, message->buffer[i]);
-  }
+  // If message is a pairing packet, send unencrypted. Otherwise, encrypt
+  // message.
+  if (message->magic == PAIR_MAGIC) {
+    debug_print("\r\nSending unencrypted pairing message");
 
-  return message->message_len;
+    for (int i = 0; i < message->message_len; i++) {
+      UARTCharPut(BOARD_UART, message->buffer[i]);
+    }
+
+    return message->message_len;
+  } else {
+    const char context[] = "boardmsg";
+    uint8_t ciphertext[hydro_secretbox_HEADERBYTES + MESSAGE_MAX_LENGTH];
+    uint32_t ciphertext_len =
+        hydro_secretbox_HEADERBYTES + message->message_len;
+
+    debug_print("\r\nEncrypting message contents");
+
+    hydro_secretbox_encrypt(ciphertext, message->buffer, message->message_len,
+                            0, context, message_key);
+
+    /* uint8_t buffer[256]; */
+    /* debug_print("\r\n\nCiphertext sent: \r\n"); */
+    /* hydro_bin2hex(buffer, 256, ciphertext, ciphertext_len); */
+    /* debug_print(buffer); */
+    /* debug_print("\r\n"); */
+
+    for (int i = 0; i < ciphertext_len; i++) {
+      UARTCharPut(BOARD_UART, ciphertext[i]);
+    }
+
+    debug_print("\r\nMessage sent");
+
+    return ciphertext_len;
+  }
 }
 
 /**
- * @brief Receive a message between boards
+ * @brief Receive an encrypted message between boards
  *
  * @param message pointer to message where data will be received
- * @return uint32_t the number of bytes received - 0 for error
+ * @return uint32_t the number of bytes received - 0 for parsing erorr, -1 for
+ * corrupted or tampered message
  */
 uint32_t receive_board_message(MESSAGE_PACKET *message) {
   message->magic = (uint8_t)UARTCharGet(BOARD_UART);
@@ -82,8 +120,32 @@ uint32_t receive_board_message(MESSAGE_PACKET *message) {
 
   message->message_len = (uint8_t)UARTCharGet(BOARD_UART);
 
-  for (int i = 0; i < message->message_len; i++) {
-    message->buffer[i] = (uint8_t)UARTCharGet(BOARD_UART);
+  if (message->magic == PAIR_MAGIC) {
+    debug_print("\r\nReceiving unencrypted pairing message");
+
+    for (int i = 0; i < message->message_len; i++) {
+      message->buffer[i] = (uint8_t)UARTCharGet(BOARD_UART);
+    }
+  } else {
+    const char context[] = "boardmsg";
+    uint8_t ciphertext[hydro_secretbox_HEADERBYTES + MESSAGE_MAX_LENGTH];
+
+    uint32_t ciphertext_len =
+        hydro_secretbox_HEADERBYTES + message->message_len;
+
+    for (int i = 0; i < ciphertext_len; i++) {
+      ciphertext[i] = (uint8_t)UARTCharGet(BOARD_UART);
+    }
+
+    debug_print("\r\nDecrypting board message");
+
+    if (hydro_secretbox_decrypt(message->buffer, ciphertext, ciphertext_len, 0,
+                                context, message_key)) {
+      debug_print("\r\nERROR: Invalid message received");
+      return -1;
+    }
+
+    debug_print("\r\nMessage received");
   }
 
   return message->message_len;
@@ -99,6 +161,10 @@ uint32_t receive_board_message(MESSAGE_PACKET *message) {
 uint32_t receive_board_message_by_type(MESSAGE_PACKET *message, uint8_t type) {
   do {
     receive_board_message(message);
+    debug_print("\r\nReceived msg with magic: 0x");
+    char magic[8];
+    hydro_bin2hex(magic, 3, &(message->magic), 1);
+    debug_print(magic);
   } while (message->magic != type);
 
   return message->message_len;

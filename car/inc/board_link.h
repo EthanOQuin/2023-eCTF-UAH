@@ -19,14 +19,19 @@
 
 #include "inc/hw_memmap.h"
 
+#include "hydrogen.h"
+
 #define ACK_SUCCESS 1
 #define ACK_FAIL 0
 
+#define HANDSHAKE_MAGIC 0x53
 #define ACK_MAGIC 0x54
 #define PAIR_MAGIC 0x55
 #define UNLOCK_MAGIC 0x56
 #define START_MAGIC 0x57
 #define BOARD_UART ((uint32_t)UART1_BASE)
+
+#define MESSAGE_MAX_LENGTH (uint8_t)255
 
 /**
  * @brief Structure for message between boards
@@ -46,7 +51,7 @@ typedef struct {
 void setup_board_link(void);
 
 /**
- * @brief Send a message between boards
+ * @brief Send an encrypted message between boards
  *
  * @param message pointer to message to send
  * @return uint32_t the number of bytes sent
@@ -54,10 +59,10 @@ void setup_board_link(void);
 uint32_t send_board_message(MESSAGE_PACKET *message);
 
 /**
- * @brief Receive a message between boards
+ * @brief Receive an encrypted message between boards
  *
  * @param message pointer to message where data will be received
- * @return uint32_t the number of bytes received
+ * @return uint32_t the number of bytes received - 0 for error
  */
 uint32_t receive_board_message(MESSAGE_PACKET *message);
 

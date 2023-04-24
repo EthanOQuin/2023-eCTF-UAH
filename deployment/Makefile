@@ -17,5 +17,7 @@ __check_defined = \
 		$(error Undefined $1))
 
 all:
+	gcc gen_key.c ./lib/libhydrogen/hydrogen.c -o /tmp/gen_key
 	$(call check_defined SECRETS_DIR)
-	echo "SECRET!" > ${SECRETS_DIR}/global_secrets.txt
+	/tmp/gen_key > ${SECRETS_DIR}/secret_key.txt
+	# echo "SECRET!" > ${SECRETS_DIR}/global_secrets.txt
