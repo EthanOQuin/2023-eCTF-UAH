@@ -13,7 +13,7 @@
 # @copyright Copyright (c) 2023 The MITRE Corporation
 
 import argparse
-import subprocess
+import os
 
 
 # @brief Function to create a new feature package
@@ -21,21 +21,7 @@ import subprocess
 # @param car_id, the id of the car the feature is being packaged for
 # @param feature_number, the feature number being packaged
 def package(package_name, car_id, feature_number):
-    # Pad id lenth to 8 bytes
-    car_id_len = len(car_id)
-    car_id_pad = (8 - car_id_len) * "\0"
-
-    # Create package to match defined structure on fob
-    package_message_bytes = (
-        str.encode(car_id + car_id_pad)
-        + (feature_number & 0xff).to_bytes(1, "little")
-        + str.encode("\n")
-    )
-
-    # Write data out to package file
-    # /package_dir/ is the mounted location inside the container - should not change
-    with open(f"/package_dir/{package_name}", "wb") as fhandle:
-        fhandle.write(package_message_bytes)
+    os.system(f"./sign_feature {car_id} {feature_number} /secrets/signing_secret_key.txt {package_name}")
 
     print("Feature packaged")
 
@@ -55,7 +41,7 @@ def main():
     parser.add_argument(
         "--car-id",
         help="Car ID",
-        type=str,
+        type=int,
         required=True,
     )
     parser.add_argument(

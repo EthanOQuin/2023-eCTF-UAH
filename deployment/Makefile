@@ -16,15 +16,10 @@ __check_defined = \
 	$(if $(value $1),, \
 		$(error Undefined $1))
 
-all: gen_key gen_keypair
+
+all:
 	$(call check_defined SECRETS_DIR)
-	/tmp/gen_key > ${SECRETS_DIR}/key.txt
-	/tmp/gen_keypair > ${SECRETS_DIR}/key.txt
-
-LIBPATH=./lib/libhydrogen
-
-gen_key:
-	gcc gen_key.c ${LIBPATH}/hydrogen.c -o /tmp/gen_key
-
-gen_keypair:
-	gcc gen_key.c ${LIBPATH}/hydrogen.c -o /tmp/gen_keypair
+	gcc gen_key.c ./lib/libhydrogen/hydrogen.c -o /tmp/gen_key
+	gcc gen_keypair.c ./lib/libhydrogen/hydrogen.c -o /tmp/gen_keypair
+	/tmp/gen_key > ${SECRETS_DIR}/secret_key.txt
+	/tmp/gen_keypair ${SECRETS_DIR}/signing_secret_key.txt ${SECRETS_DIR}/signing_public_key.txt
