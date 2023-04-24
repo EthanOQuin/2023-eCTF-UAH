@@ -48,23 +48,24 @@
 /*** Structure definitions ***/
 // Defines a struct for the format of an enable message
 typedef struct {
-  uint8_t car_id[8];
+  uint32_t car_id;
   uint8_t feature;
-} ENABLE_PACKET;
+  uint8_t signature[hydro_sign_BYTES];
+} __attribute__((packed)) ENABLE_PACKET;
 
 // Defines a struct for the format of a pairing message
 typedef struct {
-  uint8_t car_id[8];
+  uint32_t car_id;
   uint8_t pin[8];
   uint8_t message_key[hydro_secretbox_KEYBYTES];
 } PAIR_PACKET;
 
 // Defines a struct for the format of start message
 typedef struct {
-  uint8_t car_id[8];
+  uint32_t car_id;
   uint8_t num_active;
   uint8_t features[NUM_FEATURES];
-  uint8_t signatures[hydro_sign_BYTES][NUM_FEATURES];
+  uint8_t signatures[NUM_FEATURES][hydro_sign_BYTES];
 } FEATURE_DATA;
 
 // Defines a struct for storing the state in flash
@@ -87,8 +88,11 @@ void startCar(FLASH_DATA *fob_state_ram);
 // Helper functions - receive ack message
 uint8_t receiveAck();
 
-// Message key
+// Inter-board message encryption key
 uint8_t *message_key = MESSAGE_KEY;
+
+// Feature package verification key
+uint8_t *feature_verification_key = SIGNING_PUBLIC_KEY;
 
 /**
  * @brief Main function for the fob example
@@ -105,12 +109,15 @@ int main(void) {
   // Initialize UART (early for debugging)
   uart_init();
 
+  // Initialize libhydrogen
+  hydro_init();
+
 // If paired fob, initialize the system information and save to flash
 #if PAIRED == 1
   if (fob_state_flash->paired == FLASH_UNPAIRED) {
     strcpy((char *)(fob_state_ram.pair_info.pin), PAIR_PIN);
-    strcpy((char *)(fob_state_ram.pair_info.car_id), CAR_ID);
-    strcpy((char *)(fob_state_ram.feature_info.car_id), CAR_ID);
+    fob_state_ram.pair_info.car_id = CAR_ID;
+    fob_state_ram.feature_info.car_id = CAR_ID;
 
     memcpy(&fob_state_ram.pair_info.message_key, message_key,
            hydro_secretbox_KEYBYTES);
@@ -128,13 +135,8 @@ int main(void) {
     memcpy(&fob_state_ram, fob_state_flash, FLASH_DATA_SIZE);
 
     message_key = fob_state_ram.pair_info.message_key;
-
-    /* memset(message_key, 0x55, */
-    /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
   } else {
     debug_print("\r\nFob not paired to car");
-    /* memset(message_key, 0x00, */
-    /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
   }
 
   // This will run on first boot to initialize features
@@ -243,8 +245,8 @@ void pairFob(FLASH_DATA *fob_state_ram) {
     message.buffer = (uint8_t *)&fob_state_ram->pair_info;
     receive_board_message_by_type(&message, PAIR_MAGIC);
     fob_state_ram->paired = FLASH_PAIRED;
-    strcpy((char *)fob_state_ram->feature_info.car_id,
-           (char *)fob_state_ram->pair_info.car_id);
+
+    fob_state_ram->feature_info.car_id = fob_state_ram->pair_info.car_id;
 
     uart_write(HOST_UART, (uint8_t *)"Paired", 6);
 
@@ -264,26 +266,42 @@ void enableFeature(FLASH_DATA *fob_state_ram) {
     uart_readline(HOST_UART, uart_buffer);
 
     ENABLE_PACKET *enable_message = (ENABLE_PACKET *)uart_buffer;
-    if (strcmp((char *)fob_state_ram->pair_info.car_id,
-               (char *)enable_message->car_id)) {
+
+    // If feature is intended for a different car, exit
+    if (fob_state_ram->pair_info.car_id != enable_message->car_id) {
       return;
     }
 
-    // Feature list full
+    // If feature list full, exit
     if (fob_state_ram->feature_info.num_active == NUM_FEATURES) {
       return;
     }
 
-    // Search for feature in list
+    // If feature already enabled, exit
     for (int i = 0; i < fob_state_ram->feature_info.num_active; i++) {
       if (fob_state_ram->feature_info.features[i] == enable_message->feature) {
         return;
       }
     }
 
+    // If feature signature invalid, exit
+    if (hydro_sign_verify(enable_message->signature, enable_message,
+                          sizeof(enable_message->car_id) +
+                              sizeof(enable_message->feature),
+                          "verify ", feature_verification_key) != 0) {
+      debug_print("\r\nERROR: Feature verification failed.");
+      return;
+    }
+
+    // Set feature enabled, store signature (to be verified by car)
     fob_state_ram->feature_info
         .features[fob_state_ram->feature_info.num_active] =
         enable_message->feature;
+
+    memcpy(fob_state_ram->feature_info
+               .signatures[fob_state_ram->feature_info.num_active],
+           enable_message->signature, hydro_sign_BYTES);
+
     fob_state_ram->feature_info.num_active++;
 
     saveFobState(fob_state_ram);

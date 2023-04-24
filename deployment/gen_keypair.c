@@ -34,17 +34,21 @@ int main(int argc, char **argv) {
   hydro_sign_keygen(&feature_authentication_keypair);
 
   // Save secret key to file
-  char secret_key_str[hydro_sign_SECRETKEYBYTES * 2 + 1];
-  hydro_bin2hex(secret_key_str, 500, feature_authentication_keypair.sk,
+  char secret_key_str[1024];
+  hydro_bin2hex(secret_key_str, 1024, feature_authentication_keypair.sk,
                 hydro_sign_SECRETKEYBYTES);
-  fprintf(secret_key_file, "%s\n", secret_key_str);
+  fprintf(secret_key_file, "%s", secret_key_str);
+
+  char public_key_str[1024];
+  hydro_bin2hex(public_key_str, 1024, feature_authentication_keypair.pk,
+                hydro_sign_PUBLICKEYBYTES);
+  fprintf(public_key_file, "%s", public_key_str);
 
   // Save public key to file
-  for (int i = 0; i < hydro_sign_PUBLICKEYBYTES; i++) {
-    fprintf(public_key_file, "0x%x,", feature_authentication_keypair.pk[i]);
-  }
-
-  fprintf(public_key_file, "\n");
+  /* for (int i = 0; i < hydro_sign_PUBLICKEYBYTES; i++) { */
+  /*   fprintf(public_key_file, "0x%x,", feature_authentication_keypair.pk[i]);
+   */
+  /* } */
 
   // Close files
   fclose(secret_key_file);

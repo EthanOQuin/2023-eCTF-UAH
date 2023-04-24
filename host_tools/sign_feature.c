@@ -5,13 +5,19 @@
 
 #include "./lib/libhydrogen/hydrogen.h"
 
-typedef struct {
-  uint64_t car_id;
-  uint8_t feature_num;
-} __attribute__((packed)) FEATURE_PACKAGE;
+/* typedef struct { */
+/*   uint32_t car_id; */
+/*   uint8_t feature_num; */
+/* } __attribute__((packed)) FEATURE_PACKAGE; */
 
+/* typedef struct { */
+/*   FEATURE_PACKAGE p; */
+/*   uint8_t signature[hydro_sign_BYTES]; */
+/* } __attribute__((packed)) SIGNED_FEATURE_PACKAGE; */
 typedef struct {
-  FEATURE_PACKAGE p;
+  uint32_t car_id;
+  uint8_t feature_num;
+  uint8_t padding[3];
   uint8_t signature[hydro_sign_BYTES];
 } __attribute__((packed)) SIGNED_FEATURE_PACKAGE;
 
@@ -23,7 +29,7 @@ typedef struct {
 // fourth is output package filename.
 int main(int argc, char **argv) {
   // Check args
-  if (argc < 4) {
+  if (argc < 5) {
     fprintf(stderr, "ERROR: Must provide car ID, feature number, secret key "
                     "filename, and output package filename.\n");
     return 1;
@@ -39,20 +45,19 @@ int main(int argc, char **argv) {
   char input_buffer[1024];
   fgets(input_buffer, 1024, secret_key_file);
   hydro_hex2bin(feature_authentication_keypair.sk, hydro_sign_SECRETKEYBYTES,
-                input_buffer, strlen(input_buffer) - 1, 0, 0);
+                input_buffer, strlen(input_buffer), 0, 0);
 
   // Initialize feature package
-  SIGNED_FEATURE_PACKAGE signed_feature;
-  signed_feature.p.car_id = strtoull(argv[1], 0, 10);
-  signed_feature.p.feature_num = strtol(argv[2], 0, 10) & 0xFF;
+  SIGNED_FEATURE_PACKAGE s;
+  s.car_id = strtoul(argv[1], 0, 10);
+  s.feature_num = strtoul(argv[2], 0, 10) & 0xFF;
 
   // Create signature
-  hydro_sign_create(signed_feature.signature, &signed_feature.p,
-                    sizeof(FEATURE_PACKAGE), context,
-                    feature_authentication_keypair.sk);
+  hydro_sign_create(s.signature, &s, sizeof(s.car_id) + sizeof(s.feature_num),
+                    context, feature_authentication_keypair.sk);
 
   // Output to file
   FILE *output_file = fopen(argv[4], "wb");
-  fwrite(&signed_feature, sizeof(SIGNED_FEATURE_PACKAGE), 1, output_file);
+  fwrite(&s, sizeof(SIGNED_FEATURE_PACKAGE), 1, output_file);
   fclose(output_file);
 }

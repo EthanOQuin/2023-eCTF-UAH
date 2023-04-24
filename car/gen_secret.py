@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--car-id", type=int, required=True)
     parser.add_argument("--secret-key-file", type=Path, required=True)
+    parser.add_argument("--signing-public-key-file", type=Path)
     parser.add_argument("--header-file", type=Path, required=True)
     args = parser.parse_args()
 
@@ -30,14 +31,21 @@ def main():
     else:
         raise RuntimeError
 
+    if args.signing_public_key_file.exists():
+        with open(args.signing_public_key_file, "r") as f:
+            signing_public_key = f.readline()
+    else:
+        raise RuntimeError
+
     # Write to header file
     with open(args.header_file, "w") as f:
         f.write("#ifndef __CAR_SECRETS__\n")
         f.write("#define __CAR_SECRETS__\n\n")
         f.write("#include <stdint.h>\n")
         f.write("#include \"hydrogen.h\"\n\n")
-        f.write(f'#define CAR_ID "{args.car_id}"\n\n')
+        f.write(f'#define CAR_ID {args.car_id}\n\n')
         f.write(f'const uint8_t MESSAGE_KEY[hydro_secretbox_KEYBYTES] = {{{secret_key}}};\n\n')
+        f.write(f'const uint8_t SIGNING_PUBLIC_KEY[hydro_sign_PUBLICKEYBYTES] = {{{signing_public_key}}};\n\n')
         f.write("#endif\n")
 
 
