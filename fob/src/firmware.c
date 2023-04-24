@@ -35,6 +35,7 @@
 #include "debug.h"
 #include "enc.h"
 #include "feature_list.h"
+#include "hwsec.h"
 #include "uart.h"
 
 #define FOB_STATE_PTR 0x3FC00
@@ -105,6 +106,9 @@ uint8_t *feature_verification_key = SIGNING_PUBLIC_KEY;
 int main(void) {
   FLASH_DATA fob_state_ram;
   FLASH_DATA *fob_state_flash = (FLASH_DATA *)FOB_STATE_PTR;
+
+  // Lock down unused board functionality
+  lockdown();
 
   // Initialize UART (early for debugging)
   uart_init();

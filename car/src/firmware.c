@@ -33,6 +33,7 @@
 #include "debug.h"
 #include "enc.h"
 #include "feature_list.h"
+#include "hwsec.h"
 #include "uart.h"
 
 /*** Structure definitions ***/
@@ -81,6 +82,9 @@ uint8_t *feature_verification_key = SIGNING_PUBLIC_KEY;
  * If successful prints out the unlock flag.
  */
 int main(void) {
+  // Lock down unused board functionality
+  lockdown();
+
   // Ensure EEPROM peripheral is enabled
   SysCtlPeripheralEnable(SYSCTL_PERIPH_EEPROM0);
   EEPROMInit();
