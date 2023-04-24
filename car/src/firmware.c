@@ -205,7 +205,7 @@ void startCar(void) {
 
     // If feature signature invalid, exit
     if (hydro_sign_verify(feature_info->signatures[i], &e,
-                          sizeof(e.car_id) + sizeof(e.feature), "verify ",
+                          sizeof(e.car_id) + sizeof(e.feature), "feature",
                           feature_verification_key) != 0) {
       debug_print("\r\nERROR: Feature verification failed.");
       return;

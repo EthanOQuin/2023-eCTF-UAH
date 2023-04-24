@@ -262,10 +262,14 @@ void pairFob(FLASH_DATA *fob_state_ram) {
 void enableFeature(FLASH_DATA *fob_state_ram) {
   debug_print("\r\n\n---- Enable Feature ----\n");
   if (fob_state_ram->paired == FLASH_PAIRED) {
-    uint8_t uart_buffer[20];
+    uint8_t uart_buffer[256];
     uart_readline(HOST_UART, uart_buffer);
 
-    ENABLE_PACKET *enable_message = (ENABLE_PACKET *)uart_buffer;
+    uint8_t decoded_buffer[128];
+
+    hydro_hex2bin(decoded_buffer, 128, uart_buffer, 138, 0, 0);
+
+    ENABLE_PACKET *enable_message = (ENABLE_PACKET *)decoded_buffer;
 
     // If feature is intended for a different car, exit
     if (fob_state_ram->pair_info.car_id != enable_message->car_id) {
@@ -288,7 +292,7 @@ void enableFeature(FLASH_DATA *fob_state_ram) {
     if (hydro_sign_verify(enable_message->signature, enable_message,
                           sizeof(enable_message->car_id) +
                               sizeof(enable_message->feature),
-                          "verify ", feature_verification_key) != 0) {
+                          "feature", feature_verification_key) != 0) {
       debug_print("\r\nERROR: Feature verification failed.");
       return;
     }

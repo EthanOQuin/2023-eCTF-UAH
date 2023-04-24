@@ -11,7 +11,6 @@
 typedef struct {
   uint32_t car_id;
   uint8_t feature_num;
-  uint8_t padding[3];
   uint8_t signature[hydro_sign_BYTES];
 } __attribute__((packed)) SIGNED_FEATURE_PACKAGE;
 
@@ -24,16 +23,16 @@ int main(int argc, char **argv) {
   }
 
   // Initialize libhydrogen
-  char context[] = "signing";
-  hydro_sign_keypair feature_authentication_keypair;
+  char context[] = "feature";
+  uint8_t public_key[hydro_sign_PUBLICKEYBYTES];
   hydro_init();
 
   // Load signing public key
   FILE *public_key_file = fopen(argv[1], "r");
   char input_buffer[1024];
   fgets(input_buffer, 1024, public_key_file);
-  hydro_hex2bin(feature_authentication_keypair.pk, hydro_sign_PUBLICKEYBYTES,
-                input_buffer, strlen(input_buffer), 0, 0);
+  hydro_hex2bin(public_key, hydro_sign_PUBLICKEYBYTES, input_buffer,
+                hydro_sign_PUBLICKEYBYTES * 2, 0, 0);
 
   // Read input from file
   FILE *input_file = fopen(argv[2], "rb");
@@ -42,8 +41,8 @@ int main(int argc, char **argv) {
   fread(&s, sizeof(SIGNED_FEATURE_PACKAGE), 1, input_file);
 
   if (hydro_sign_verify(s.signature, &s,
-                        sizeof(s.car_id) + sizeof(s.feature_num), "verify ",
-                        feature_authentication_keypair.pk) != 0) {
+                        sizeof(s.car_id) + sizeof(s.feature_num), context,
+                        public_key) != 0) {
     printf("ERROR: Feature verification failed.\n");
     return 1;
   }

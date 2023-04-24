@@ -17,7 +17,6 @@
 typedef struct {
   uint32_t car_id;
   uint8_t feature_num;
-  uint8_t padding[3];
   uint8_t signature[hydro_sign_BYTES];
 } __attribute__((packed)) SIGNED_FEATURE_PACKAGE;
 
@@ -36,7 +35,7 @@ int main(int argc, char **argv) {
   }
 
   // Initialize libhydrogen
-  char context[] = "signing";
+  char context[] = "feature";
   hydro_sign_keypair feature_authentication_keypair;
   hydro_init();
 
@@ -45,7 +44,7 @@ int main(int argc, char **argv) {
   char input_buffer[1024];
   fgets(input_buffer, 1024, secret_key_file);
   hydro_hex2bin(feature_authentication_keypair.sk, hydro_sign_SECRETKEYBYTES,
-                input_buffer, strlen(input_buffer), 0, 0);
+                input_buffer, hydro_sign_SECRETKEYBYTES * 2, 0, 0);
 
   // Initialize feature package
   SIGNED_FEATURE_PACKAGE s;
@@ -57,7 +56,9 @@ int main(int argc, char **argv) {
                     context, feature_authentication_keypair.sk);
 
   // Output to file
-  FILE *output_file = fopen(argv[4], "wb");
-  fwrite(&s, sizeof(SIGNED_FEATURE_PACKAGE), 1, output_file);
+  FILE *output_file = fopen(argv[4], "w");
+  char output_buffer[1024];
+  hydro_bin2hex(output_buffer, 1024, &s, sizeof(s));
+  fprintf(output_file, "%s\n", output_buffer);
   fclose(output_file);
 }
