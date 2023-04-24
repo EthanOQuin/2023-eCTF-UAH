@@ -64,12 +64,6 @@ void setup_board_link(void) {
 uint32_t send_board_message(MESSAGE_PACKET *message) {
   debug_print("\r\nSending board message");
 
-  uint8_t buffer[256];
-  hydro_bin2hex(buffer, 256, message_key, hydro_secretbox_KEYBYTES);
-  debug_print("\r\n");
-  debug_print(buffer);
-  debug_print("\r\n");
-
   UARTCharPut(BOARD_UART, message->magic);
   UARTCharPut(BOARD_UART, message->message_len);
 
@@ -93,6 +87,12 @@ uint32_t send_board_message(MESSAGE_PACKET *message) {
 
     hydro_secretbox_encrypt(ciphertext, message->buffer, message->message_len,
                             0, context, message_key);
+
+    /* uint8_t buffer[256]; */
+    /* debug_print("\r\n\nCiphertext sent: \r\n"); */
+    /* hydro_bin2hex(buffer, 256, ciphertext, ciphertext_len); */
+    /* debug_print(buffer); */
+    /* debug_print("\r\n"); */
 
     for (int i = 0; i < ciphertext_len; i++) {
       UARTCharPut(BOARD_UART, ciphertext[i]);
