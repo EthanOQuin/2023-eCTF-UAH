@@ -63,7 +63,7 @@ const uint8_t pass[] = PASSWORD;
 const uint8_t car_id[] = CAR_ID;
 
 // Message key
-uint8_t message_key[hydro_secretbox_KEYBYTES]; // TODO: add pregenerated key
+uint8_t *message_key = MESSAGE_KEY;
 
 /**
  * @brief Main function for the car example
@@ -87,8 +87,8 @@ int main(void) {
   // Initialize board link UART
   setup_board_link();
 
-  memset(message_key, 0x55,
-         hydro_secretbox_KEYBYTES); // TODO: replace with actual key
+  /* memset(message_key, 0x55, */
+  /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
 
   while (true) {
     unlockCar();

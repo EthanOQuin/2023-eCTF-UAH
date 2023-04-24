@@ -27,6 +27,8 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/timer.h"
 
+#include "hydrogen.h"
+
 #include "secrets.h"
 
 #include "board_link.h"
@@ -55,6 +57,7 @@ typedef struct {
   uint8_t car_id[8];
   uint8_t password[8];
   uint8_t pin[8];
+  uint8_t message_key[hydro_secretbox_KEYBYTES];
 } PAIR_PACKET;
 
 // Defines a struct for the format of start message
@@ -69,6 +72,7 @@ typedef struct {
   uint8_t paired;
   PAIR_PACKET pair_info;
   FEATURE_DATA feature_info;
+  uint8_t padding[3];
 } FLASH_DATA;
 
 /*** Function definitions ***/
@@ -84,7 +88,7 @@ void startCar(FLASH_DATA *fob_state_ram);
 uint8_t receiveAck();
 
 // Message key
-uint8_t message_key[hydro_secretbox_KEYBYTES]; // TODO: add pregenerated key
+uint8_t *message_key = MESSAGE_KEY;
 
 /**
  * @brief Main function for the fob example
@@ -108,6 +112,10 @@ int main(void) {
     strcpy((char *)(fob_state_ram.pair_info.pin), PAIR_PIN);
     strcpy((char *)(fob_state_ram.pair_info.car_id), CAR_ID);
     strcpy((char *)(fob_state_ram.feature_info.car_id), CAR_ID);
+
+    memcpy(&fob_state_ram.pair_info.message_key, message_key,
+           hydro_secretbox_KEYBYTES);
+
     fob_state_ram.paired = FLASH_PAIRED;
 
     saveFobState(&fob_state_ram);
@@ -120,12 +128,14 @@ int main(void) {
     debug_print("\r\nFob paired to car, loading data");
     memcpy(&fob_state_ram, fob_state_flash, FLASH_DATA_SIZE);
 
-    memset(message_key, 0x55,
-           hydro_secretbox_KEYBYTES); // TODO: replace with actual key
+    message_key = fob_state_ram.pair_info.message_key;
+
+    /* memset(message_key, 0x55, */
+    /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
   } else {
     debug_print("\r\nFob not paired to car");
-    memset(message_key, 0x00,
-           hydro_secretbox_KEYBYTES); // TODO: replace with actual key
+    /* memset(message_key, 0x00, */
+    /*        hydro_secretbox_KEYBYTES); // TODO: replace with actual key */
   }
 
   // This will run on first boot to initialize features

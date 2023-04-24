@@ -29,8 +29,7 @@
 
 #include "hydrogen.h"
 
-extern uint8_t
-    message_key[hydro_secretbox_KEYBYTES]; // TODO: add pregenerated key
+extern uint8_t *message_key;
 
 /**
  * @brief Set the up board link object
@@ -64,6 +63,12 @@ void setup_board_link(void) {
  */
 uint32_t send_board_message(MESSAGE_PACKET *message) {
   debug_print("\r\nSending board message");
+
+  uint8_t buffer[256];
+  hydro_bin2hex(buffer, 256, message_key, hydro_secretbox_KEYBYTES);
+  debug_print("\r\n");
+  debug_print(buffer);
+  debug_print("\r\n");
 
   UARTCharPut(BOARD_UART, message->magic);
   UARTCharPut(BOARD_UART, message->message_len);

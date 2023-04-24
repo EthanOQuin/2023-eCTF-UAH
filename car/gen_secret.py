@@ -12,7 +12,6 @@
 #
 # @copyright Copyright (c) 2023 The MITRE Corporation
 
-import json
 import argparse
 from pathlib import Path
 
@@ -20,33 +19,27 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--car-id", type=int, required=True)
-    parser.add_argument("--secret-file", type=Path, required=True)
+    parser.add_argument("--secret-key-file", type=Path, required=True)
     parser.add_argument("--header-file", type=Path, required=True)
     args = parser.parse_args()
 
     # Open the secret file if it exists
-    if args.secret_file.exists():
-        with open(args.secret_file, "r") as fp:
-            secrets = json.load(fp)
+    if args.secret_key_file.exists():
+        with open(args.secret_key_file, "r") as f:
+            secret_key = f.readline()
     else:
-        secrets = {}
-
-    # Add dummy secret
-    car_secret = args.car_id + 1
-    secrets[str(args.car_id)] = car_secret
-
-    # Save the secret file
-    with open(args.secret_file, "w") as fp:
-        json.dump(secrets, fp, indent=4)
+        raise RuntimeError
 
     # Write to header file
-    with open(args.header_file, "w") as fp:
-        fp.write("#ifndef __CAR_SECRETS__\n")
-        fp.write("#define __CAR_SECRETS__\n\n")
-        fp.write(f"#define CAR_SECRET {car_secret}\n\n")
-        fp.write(f'#define CAR_ID "{args.car_id}"\n\n')
-        fp.write('#define PASSWORD "unlock"\n\n')
-        fp.write("#endif\n")
+    with open(args.header_file, "w") as f:
+        f.write("#ifndef __CAR_SECRETS__\n")
+        f.write("#define __CAR_SECRETS__\n\n")
+        f.write("#include <stdint.h>\n")
+        f.write("#include \"hydrogen.h\"\n\n")
+        f.write(f'#define CAR_ID "{args.car_id}"\n\n')
+        f.write('#define PASSWORD "unlock"\n\n')
+        f.write(f'const uint8_t MESSAGE_KEY[hydro_secretbox_KEYBYTES] = {{{secret_key}}};\n\n')
+        f.write("#endif\n")
 
 
 if __name__ == "__main__":
