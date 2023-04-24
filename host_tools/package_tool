@@ -14,6 +14,7 @@
 
 import argparse
 import os
+import subprocess
 
 
 # @brief Function to create a new feature package
@@ -21,7 +22,7 @@ import os
 # @param car_id, the id of the car the feature is being packaged for
 # @param feature_number, the feature number being packaged
 def package(package_name, car_id, feature_number):
-    os.system(f"./sign_feature {car_id} {feature_number} /secrets/signing_secret_key.txt {package_name}")
+    subprocess.run(f"./sign_feature {car_id} {feature_number} /secrets/signing_secret_key.txt /package_dir/{package_name}", shell=True, check=True)
 
     print("Feature packaged")
 
